@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Counter} from "../src/Counter.sol";
 
-contract VotingTest is Test {
+contract CounterTest is Test {
     Counter public counter;
 
     function setUp() public {

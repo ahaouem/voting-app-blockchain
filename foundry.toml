@@ -1,38 +1,6 @@
 [profile.default]
 src = "src"
-test = 'test'
-script = 'script'
 out = "out"
 libs = ["lib"]
-cache = true
-cache_path = 'cache'
-gas_reports = ['*']
-auto_detect_solc = true
-solc = "0.8.21"
-verbosity = 2
-block_number = 0
-fork_block_number = 0
-chain_id = 1
-bytecode_hash = "ipfs"
-build_info = true
-build_info_path = "build-info"
 
-remappings = ['@openzeppelin/contracts=lib/openzeppelin-contracts/contracts']
-
-[etherscan]
-mainnet = { key = "" }
-
-[rpc_endpoints]
-mainnet = ""
-
-[fuzz]
-runs = 256
-max_test_rejects = 65536
-
-[fmt]
-line_length = 100
-tab_width = 4
-bracket_spacing = true
-trailing_comma = "always"
-semi = true
-single_quote = false
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

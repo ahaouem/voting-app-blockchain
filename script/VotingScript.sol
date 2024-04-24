@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
 import { Voting } from "../src/Voting.sol";
@@ -9,7 +9,7 @@ contract VotingScript is Script {
     uint256 public DEFAULT_ANVIL_PRIVATE_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     uint256 public deployerKey;
 
-    function setUp() public {
+    function setUp() public view {
         console.log("Setting up VotingScript");
     }
 

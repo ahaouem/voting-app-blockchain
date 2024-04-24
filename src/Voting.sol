@@ -125,4 +125,8 @@ contract Voting {
     function getVoter(address voterAddress) public view returns (Voter memory) {
         return voters[voterAddress];
     }
+
+    function getOwner() public view returns (address) {
+        return owner;
+    }
 }

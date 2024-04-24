@@ -89,4 +89,25 @@ contract Voting {
         voters[msg.sender].voteTime = block.timestamp;
         votesCount++;
     }
+
+    function endVoting() public onlyOwner {
+        state = State.Ended;
+    }
+
+    function removeVoter(address voterAddress) public onlyOwner {
+        delete voters[voterAddress];
+    }
+
+    function removeVote(address voterAddress) public notOwner {
+        if (voters[voterAddress].voterAddress == address(0)) {
+            revert Voting__InvalidVoter();
+        }
+
+        delete voters[voterAddress];
+        votesCount--;
+    }
+
+    function getChoices() public view returns (string[] memory) {
+        return choices;
+    }
 }

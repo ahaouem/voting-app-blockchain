@@ -12,7 +12,7 @@ contract Voting {
     address public owner;
     uint256 public votingStartTime;
     uint256 public votingEndTime;
-    string[] public choices;
+    string[2] public choices;
     bool public isPrivate;
     string public category;
     string public description;
@@ -23,7 +23,7 @@ contract Voting {
 
     constructor(
         uint256 _votingEndTime,
-        string[] memory _choices,
+        string[2] memory _choices,
         bool _isPrivate,
         string memory _category,
         string memory _description,
@@ -114,7 +114,7 @@ contract Voting {
         votesCount--;
     }
 
-    function getChoices() public view returns (string[] memory) {
+    function getChoices() public view returns (string[2] memory) {
         return choices;
     }
 

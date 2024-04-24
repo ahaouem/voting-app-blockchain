@@ -17,7 +17,8 @@ bytecode_hash = "ipfs"
 build_info = true
 build_info_path = "build-info"
 
-remappings = ['@openzeppelin/contracts=lib/openzeppelin-contracts/contracts']
+[profile.remappings]
+forge-std = "lib/forge-std"
 
 [etherscan]
 mainnet = { key = "" }

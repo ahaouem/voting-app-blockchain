@@ -71,7 +71,14 @@ contract Voting {
         _;
     }
 
-    function vote(uint256 choiceIndex) public notOwner {
+    modifier votingTime() {
+        if (block.timestamp < votingStartTime || block.timestamp > votingEndTime) {
+            revert Voting__InvalidState();
+        }
+        _;
+    }
+
+    function vote(uint256 choiceIndex) public notOwner votingTime {
         if (state == State.Ended) {
             revert Voting__InvalidState();
         }
@@ -94,11 +101,11 @@ contract Voting {
         state = State.Ended;
     }
 
-    function removeVoter(address voterAddress) public onlyOwner {
+    function removeVoter(address voterAddress) public onlyOwner votingTime {
         delete voters[voterAddress];
     }
 
-    function removeVote(address voterAddress) public notOwner {
+    function removeVote(address voterAddress) public notOwner votingTime {
         if (voters[voterAddress].voterAddress == address(0)) {
             revert Voting__InvalidVoter();
         }
@@ -109,5 +116,13 @@ contract Voting {
 
     function getChoices() public view returns (string[] memory) {
         return choices;
+    }
+
+    function getState() public view returns (State) {
+        return state;
+    }
+
+    function getVoter(address voterAddress) public view returns (Voter memory) {
+        return voters[voterAddress];
     }
 }

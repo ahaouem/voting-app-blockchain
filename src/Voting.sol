@@ -6,58 +6,127 @@ error Voting__InvalidState();
 error Voting__InvalidVoter();
 error Voting__AlreadyVoted();
 error Voting__NotOwner();
+error Voting__DisabledForOwner();
 
 contract Voting {
+    address public owner;
+    uint256 public votingStartTime;
+    uint256 public votingEndTime;
+    string[2] public choices;
+    bool public isPrivate;
+    string public category;
+    string public description;
+    string public title;
+    string public image;
+
+    uint256 public votesCount = 0;
+
+    constructor(
+        uint256 _votingEndTime,
+        string[2] memory _choices,
+        bool _isPrivate,
+        string memory _category,
+        string memory _description,
+        string memory _title,
+        string memory _image
+    ) {
+        owner = msg.sender;
+        votingStartTime = block.timestamp;
+        votingEndTime = _votingEndTime;
+        choices = _choices;
+        isPrivate = _isPrivate;
+        category = _category;
+        description = _description;
+        title = _title;
+        image = _image;
+    }
+
     struct Voter {
-        address candidateAddress;
-        string name;
-        uint256 choiceIndex;
-        uint256 voteCount;
-    }
-
-    struct Vote {
         address voterAddress;
+        bool hasVoted;
         uint256 choiceIndex;
+        uint256 voteTime;
     }
 
-    struct Candidate {
-        string name;
-        uint256 voteCount;
-    }
+    mapping(address => Voter) public voters;
+
     enum State {
-        Created,
-        Voting,
+        Started,
         Ended
     }
 
-    address public owner;
-    string public votingName;
-    uint256 public votingStart;
-    uint256 public votingEnd;
-    State public state;
-    address[] public voters;
+    State public state = State.Started;
 
-    mapping(address => Voter) public voterInfo;
-    mapping(address => bool) public hasVoted;
-    mapping(uint256 => Candidate) public candidates;
+    modifier onlyOwner() {
+        if (msg.sender != owner) {
+            revert Voting__NotOwner();
+        }
+        _;
+    }
 
-    function vote(uint256 _choiceIndex) public {
-        if (state != State.Voting) {
+    modifier notOwner() {
+        if (msg.sender == owner) {
+            revert Voting__DisabledForOwner();
+        }
+        _;
+    }
+
+    modifier votingTime() {
+        if (block.timestamp < votingStartTime || block.timestamp > votingEndTime) {
             revert Voting__InvalidState();
         }
-        if (voterInfo[msg.sender].candidateAddress == address(0)) {
-            revert Voting__InvalidVoter();
-        }
-        if (hasVoted[msg.sender]) {
-            revert Voting__AlreadyVoted();
-        }
-        if (_choiceIndex >= voters.length) {
-            revert Voting__InvalidChoiceIndex(_choiceIndex);
+        _;
+    }
+
+    function vote(uint256 choiceIndex) public notOwner votingTime {
+        if (state == State.Ended) {
+            revert Voting__InvalidState();
         }
 
-        voterInfo[msg.sender].choiceIndex = _choiceIndex;
-        voterInfo[msg.sender].voteCount += 1;
-        candidates[_choiceIndex].voteCount += 1;
-        hasVoted[msg.sender] = true;
+        if (voters[msg.sender].hasVoted) {
+            revert Voting__AlreadyVoted();
+        }
+
+        if (choiceIndex >= choices.length) {
+            revert Voting__InvalidChoiceIndex(choiceIndex);
+        }
+
+        voters[msg.sender].hasVoted = true;
+        voters[msg.sender].choiceIndex = choiceIndex;
+        voters[msg.sender].voteTime = block.timestamp;
+        votesCount++;
+    }
+
+    function endVoting() public onlyOwner {
+        state = State.Ended;
+    }
+
+    function removeVoter(address voterAddress) public onlyOwner votingTime {
+        delete voters[voterAddress];
+    }
+
+    function removeVote(address voterAddress) public notOwner votingTime {
+        if (voters[voterAddress].voterAddress == address(0)) {
+            revert Voting__InvalidVoter();
+        }
+
+        delete voters[voterAddress];
+        votesCount--;
+    }
+
+    function getChoices() public view returns (string[2] memory) {
+        return choices;
+    }
+
+    function getState() public view returns (State) {
+        return state;
+    }
+
+    function getVoter(address voterAddress) public view returns (Voter memory) {
+        return voters[voterAddress];
+    }
+
+    function getOwner() public view returns (address) {
+        return owner;
     }
 }

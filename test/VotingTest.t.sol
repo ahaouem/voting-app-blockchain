@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import { StdAssertions } from "forge-std/StdAssertions.sol";
 import { Test } from "forge-std/Test.sol";
 import { Voting } from "../src/Voting.sol";
-import { VotingScript } from "../script/VotingScript.sol";
+import { VotingScript } from "../script/VotingScript.s.sol";
 
 contract VotingTest is Test {
     uint256 constant VOTING_END_TIME = 1000;

@@ -24,14 +24,15 @@ forge-std = "lib/forge-std"
 mainnet = { key = "" }
 
 [rpc_endpoints]
-mainnet = ""
+mainnet = "https://mainnet.infura.io/v3/e94aa65f254c4e5eb1034773cc6e5018"
+sepolia = "https://sepolia.infura.io/v3/e94aa65f254c4e5eb1034773cc6e5018"
 
 [fuzz]
 runs = 256
 max_test_rejects = 65536
 
 [fmt]
-line_length = 120
+line_length = 150
 tab_width = 4
 bracket_spacing = true
 trailing_comma = "always"

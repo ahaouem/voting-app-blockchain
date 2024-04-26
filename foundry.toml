@@ -32,7 +32,7 @@ runs = 256
 max_test_rejects = 65536
 
 [fmt]
-line_length = 120
+line_length = 150
 tab_width = 4
 bracket_spacing = true
 trailing_comma = "always"

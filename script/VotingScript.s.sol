@@ -13,18 +13,31 @@ contract VotingScript is Script {
     function run() external returns (Voting) {
         if (block.chainid == 31337) {
             deployerKey = DEFAULT_ANVIL_PRIVATE_KEY;
-        } else deployerKey = vm.envUint("PRIVATE_KEY");
+        } else {
+            deployerKey = vm.envUint("PRIVATE_KEY");
+        }
+
+        uint256 votingEndTime = block.timestamp + 1000;
+        string[2] memory choices = ["Yes", "No"];
+        bool isPrivate = false;
+        string memory category = "General";
+        string memory description = "Description";
+        string memory title = "Title";
+        string
+            memory image = "https://avatars.githubusercontent.com/u/99892494?s=200&v=4";
+        address[] memory allowedVoters;
 
         vm.startBroadcast(deployerKey);
 
         Voting voting = new Voting(
-            block.timestamp + 1000,
-            ["Yes", "No"],
-            false,
-            "General",
-            "Description",
-            "Title",
-            "https://avatars.githubusercontent.com/u/99892494?s=200&v=4"
+            votingEndTime,
+            choices,
+            isPrivate,
+            category,
+            description,
+            title,
+            image,
+            allowedVoters
         );
 
         vm.stopBroadcast();

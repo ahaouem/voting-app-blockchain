@@ -7,6 +7,8 @@ error Voting__InvalidVoter();
 error Voting__AlreadyVoted();
 error Voting__NotOwner();
 error Voting__DisabledForOwner();
+error Voting__UserHasNotVoted(address voterAddress);
+error Voting__UserNotAllowedToVote(address voterAddress);
 
 contract Voting {
     address public owner;
@@ -19,6 +21,8 @@ contract Voting {
     string public title;
     string public image;
 
+    address[] public allowedVoters;
+
     uint256 public votesCount = 0;
 
     constructor(
@@ -28,17 +32,19 @@ contract Voting {
         string memory _category,
         string memory _description,
         string memory _title,
-        string memory _image
+        string memory _image,
+        address[] memory _allowedVoters
     ) {
         owner = msg.sender;
         votingStartTime = block.timestamp;
-        votingEndTime = _votingEndTime;
+        votingEndTime = block.timestamp + _votingEndTime;
         choices = _choices;
         isPrivate = _isPrivate;
         category = _category;
         description = _description;
         title = _title;
         image = _image;
+        allowedVoters = _allowedVoters;
     }
 
     struct Voter {
@@ -72,25 +78,57 @@ contract Voting {
     }
 
     modifier votingTime() {
-        if (block.timestamp < votingStartTime || block.timestamp > votingEndTime) {
+        if (votingStartTime > votingEndTime) {
             revert Voting__InvalidState();
         }
         _;
     }
 
-    function vote(uint256 choiceIndex) public notOwner votingTime {
-        if (state == State.Ended) {
-            revert Voting__InvalidState();
-        }
-
+    modifier userHasVoted() {
         if (voters[msg.sender].hasVoted) {
-            revert Voting__AlreadyVoted();
+            revert Voting__UserHasNotVoted(msg.sender);
         }
+        _;
+    }
 
-        if (choiceIndex >= choices.length) {
-            revert Voting__InvalidChoiceIndex(choiceIndex);
+    modifier invalidChoiceIndex() {
+        if (voters[msg.sender].choiceIndex >= choices.length) {
+            revert Voting__InvalidChoiceIndex(voters[msg.sender].choiceIndex);
         }
+        _;
+    }
 
+    modifier notAllowedVoter() {
+        if (isPrivate) {
+            bool isAllowedVoter = false;
+            for (
+                uint256 userIndex = 0;
+                userIndex < allowedVoters.length;
+                userIndex++
+            ) {
+                if (allowedVoters[userIndex] == msg.sender) {
+                    isAllowedVoter = true;
+                    break;
+                }
+            }
+
+            if (!isAllowedVoter) {
+                revert Voting__UserNotAllowedToVote(msg.sender);
+            }
+        }
+        _;
+    }
+
+    function vote(
+        uint256 choiceIndex
+    )
+        public
+        notOwner
+        userHasVoted
+        votingTime
+        invalidChoiceIndex
+        notAllowedVoter
+    {
         voters[msg.sender].hasVoted = true;
         voters[msg.sender].choiceIndex = choiceIndex;
         voters[msg.sender].voteTime = block.timestamp;
@@ -128,5 +166,9 @@ contract Voting {
 
     function getOwner() public view returns (address) {
         return owner;
+    }
+
+    function getAllowedVoters() public view returns (address[] memory) {
+        return allowedVoters;
     }
 }

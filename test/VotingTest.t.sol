@@ -14,7 +14,7 @@ contract VotingTest is Test {
     string constant DESCRIPTION = "Description";
     string constant TITLE = "Title";
     string constant IMAGE = "https://avatars.githubusercontent.com/u/99892494?s=200&v=4";
-    
+
     Voting public voting;
     VotingScript public deployer;
 

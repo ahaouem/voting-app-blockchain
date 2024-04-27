@@ -161,6 +161,13 @@ contract Voting {
         _;
     }
 
+    modifier validVoter(address voterAddress) {
+        if (voters[voterAddress].voterAddress == address(0)) {
+            revert Voting__InvalidVoter();
+        }
+        _;
+    }
+
     /**
      * @param choiceIndex The index of the choice to vote for.
      * @dev Allows a user to vote for a choice.
@@ -196,11 +203,9 @@ contract Voting {
      * @param voterAddress The address of the voter to remove the vote from.
      * @dev Removes the vote of a voter, if the voter has voted.
      */
-    function removeVote(address voterAddress) public notOwner votingTime {
-        if (voters[voterAddress].voterAddress == address(0)) {
-            revert Voting__InvalidVoter();
-        }
-
+    function removeVote(
+        address voterAddress
+    ) public notOwner votingTime validVoter {
         delete voters[voterAddress];
         votesCount--;
 

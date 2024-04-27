@@ -25,7 +25,7 @@ mainnet = { key = "" }
 
 [rpc_endpoints]
 mainnet = "https://mainnet.infura.io/v3/e94aa65f254c4e5eb1034773cc6e5018"
-sepolia = "https://sepolia.infura.io/v3/e94aa65f254c4e5eb1034773cc6e5018"
+sepolia = "https://optimism-sepolia.infura.io/v3/e94aa65f254c4e5eb1034773cc6e5018"
 
 [fuzz]
 runs = 256

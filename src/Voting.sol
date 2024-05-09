@@ -205,7 +205,7 @@ contract Voting {
      */
     function removeVote(
         address voterAddress
-    ) public notOwner votingTime validVoter {
+    ) public notOwner votingTime validVoter(voterAddress) {
         delete voters[voterAddress];
         votesCount--;
 

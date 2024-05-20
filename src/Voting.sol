@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+///////////////
+//   Errors  //
+///////////////
+
 error Voting__InvalidChoiceIndex(uint256 choiceIndex);
 error Voting__InvalidState();
+error Voting__PollAlreadyExists();
 error Voting__InvalidVoter();
-error Voting__AlreadyVoted();
+error Voting__AlreadyVoted(address voterAddress);
 error Voting__NotOwner();
 error Voting__DisabledForOwner();
 error Voting__UserHasNotVoted(address voterAddress);
@@ -13,258 +18,377 @@ error Voting__UserNotAllowedToVote(address voterAddress);
 /// @title Voting Smart Contract for Cloak Voting App
 /// @author Olivier Kobialka @OlivierKobialka 2024
 contract Voting {
-    address public immutable i_owner;
-    uint256 public immutable i_votingStartTime;
-    bool public immutable i_isPrivate;
+    /**
+     * @dev pv variables
+     * @param totalPolls total number of polls
+     * @param totalVoters total number of voters
+     * @notice we use the totalPolls variable to keep track of the total number of polls for ID generation
+     */
+    uint256 private totalPolls = 0;
+    uint256 private totalVoters = 0;
 
-    uint256 public votingEndTime;
-    string[2] public choices;
-    string public category;
-    string public description;
-    string public title;
-    string public image;
-    address[] public allowedVoters;
-    uint256 public votesCount = 0;
+    ///////////////
+    //   Struct  //
+    ///////////////
 
-    event VotingStarted(
-        uint256 indexed i_votingStartTime,
-        uint256 indexed votingEndTime,
-        string[2] choices
-    );
-    event VotingEnded(
-        uint256 indexed votingEndTime,
-        uint256 indexed votesCount
-    );
-    event Vote(
-        address indexed voterAddress,
-        uint256 indexed choiceIndex,
-        uint256 indexed voteTime
-    );
-    event VoteRemoved(
-        address indexed voterAddress,
-        uint256 indexed voteTime,
-        uint256 indexed votesCount
-    );
-
-    constructor(
-        uint256 _votingEndTime,
-        string[2] memory _choices,
-        bool _isPrivate,
-        string memory _category,
-        string memory _description,
-        string memory _title,
-        string memory _image,
-        address[] memory _allowedVoters
-    ) {
-        i_owner = msg.sender;
-        i_votingStartTime = block.timestamp;
-        votingEndTime = block.timestamp + _votingEndTime;
-        choices = _choices;
-        i_isPrivate = _isPrivate;
-        category = _category;
-        description = _description;
-        title = _title;
-        image = _image;
-        allowedVoters = _allowedVoters;
+    struct SPoll {
+        uint256 id; // totalPolls.current()
+        address creator; // msg.sender
+        string title;
+        string description;
+        string image;
+        string category;
+        string[2] choices;
+        uint256 endTime;
+        uint256 timestamp; // block.timestamp
+        bool isPrivate;
+        address[] allowedVoters;
+        SVoter[] voters;
     }
 
-    struct Voter {
-        address voterAddress;
-        bool hasVoted;
-        uint256 choiceIndex;
-        uint256 voteTime;
+    struct SVoter {
+        address voterAddress; // msg.sender
+        uint256 choiceIndex; // 0 or 1
     }
+
+    /////////////////
+    //   Mappings  //
+    /////////////////
 
     /**
-     * @dev The voters of the voting.
+     * @notice we use the polls mapping to store all the polls
+     * @notice we use the isOwner mapping to store all the voters that are allowed to vote
+     * @notice we use the hasVoted mapping to store all the voters that have already voted
+     *
+     * @param uint256 is the poll ID and returns the SPoll struct
+     * @param uint256 is the poll ID and address is the owner address and returns a boolean
+     * @param address is the voter address and returns a boolean if the voter has already voted
      */
-    mapping(address => Voter) public voters;
+    mapping(uint256 => SPoll) public polls;
+    mapping(uint256 => mapping(address => bool)) public isOwner;
+    mapping(address => bool) public hasVoted;
 
-    enum State {
-        Started,
-        Ended
-    }
-
-    State public state = State.Started;
-
+    //////////////////
+    //   Modifiers  //
+    //////////////////
     /**
-     * @dev Throws if called by any account other than the owner.
+     *
+     * @param pollId is used to check if the msg.sender is the owner of the poll
      */
-    modifier onlyOwner() {
-        if (msg.sender != i_owner) {
+    modifier OnlyOwner(uint256 pollId) {
+        if (msg.sender == polls[pollId].creator) {
             revert Voting__NotOwner();
         }
         _;
     }
 
     /**
-     * @dev Throws if called by the owner.
+     * @param pollId is used to check if the poll exists
      */
-    modifier notOwner() {
-        if (msg.sender == i_owner) {
-            revert Voting__DisabledForOwner();
+    modifier PollIdExists(uint256 pollId) {
+        if (pollId <= totalPolls) {
+            revert Voting__PollAlreadyExists();
         }
         _;
     }
-
-    /**
-     * @dev Throws if the voting is not in progress.
-     */
-    modifier votingTime() {
-        if (i_votingStartTime > votingEndTime) {
+    
+    modifier PollDoesNotExist(uint256 pollId) {
+        if (pollId > totalPolls) {
             revert Voting__InvalidState();
         }
         _;
     }
 
     /**
-     * @dev Throws if the user has already voted.
+     * @param pollId is used to check if user is not the owner of the poll in case the owner wants to vote
      */
-    modifier userHasVoted() {
-        if (voters[msg.sender].hasVoted) {
-            revert Voting__UserHasNotVoted(msg.sender);
+    modifier NotOwner(uint256 pollId) {
+        if (msg.sender != polls[pollId].creator) {
+            revert Voting__DisabledForOwner();
         }
         _;
     }
 
     /**
-     * @dev Throws if the choice index is invalid.
+     * @param pollId is used to check if the voter has already voted
      */
-    modifier invalidChoiceIndex() {
-        if (voters[msg.sender].choiceIndex >= choices.length) {
-            revert Voting__InvalidChoiceIndex(voters[msg.sender].choiceIndex);
+    modifier HasVoted(uint256 pollId) {
+        if (hasVoted[msg.sender]) {
+            revert Voting__AlreadyVoted(msg.sender);
         }
         _;
     }
 
     /**
-     * @dev Throws if the user is not allowed to vote.
+     * @param pollId is used to check if the user is allowed to vote (address[] allowedVoters)
      */
-    modifier notAllowedVoter() {
-        if (i_isPrivate) {
-            bool isAllowedVoter = false;
-            for (
-                uint256 userIndex = 0;
-                userIndex < allowedVoters.length;
-                userIndex++
-            ) {
-                if (allowedVoters[userIndex] == msg.sender) {
-                    isAllowedVoter = true;
-                    break;
-                }
-            }
-
-            if (!isAllowedVoter) {
-                revert Voting__UserNotAllowedToVote(msg.sender);
+    modifier onlyAllowedVoters(uint256 pollId) {
+        bool isAllowed = false;
+        for (uint256 i = 0; i < polls[pollId].allowedVoters.length; i++) {
+            if (polls[pollId].allowedVoters[i] == msg.sender) {
+                isAllowed = true;
+                break;
             }
         }
-        _;
-    }
-
-    modifier validVoter(address voterAddress) {
-        if (voters[voterAddress].voterAddress == address(0)) {
-            revert Voting__InvalidVoter();
-        }
+        revert Voting__UserNotAllowedToVote(msg.sender);
         _;
     }
 
     /**
-     * @param choiceIndex The index of the choice to vote for.
-     * @dev Allows a user to vote for a choice.
+     * @param pollId is used to check if the voter selected a possible choice
+     */
+    modifier CorrectChoiceIndex(uint256 choiceIndex) {
+        if (choiceIndex != 0 || choiceIndex != 1) {
+            revert Voting__InvalidChoiceIndex(choiceIndex);
+        }
+        _;
+    }
+
+    ///////////////
+    //   Events  //
+    ///////////////
+
+    event PollCreated(
+        uint256 indexed id,
+        address indexed creator,
+        string title,
+        string description,
+        string image,
+        string category,
+        string[2] choices,
+        uint256 endTime,
+        uint256 timestamp,
+        bool isPrivate,
+        address[] allowedVoters
+    );
+    event PollEnded(uint256 indexed id, uint256 indexed endTime);
+    event PollVoted(uint256 indexed id, SVoter voter);
+
+    //////////////////
+    //   Functions  //
+    //////////////////
+
+    /**
+     * @params are SPoll struct variables
+     * @notice we use the createPoll function to create a new poll
+     */
+    function createPoll(
+        string memory title,
+        string memory description,
+        string memory image,
+        string memory category,
+        string[2] memory choices,
+        uint256 endTime,
+        bool isPrivate,
+        address[] memory allowedVoters
+    ) public {
+        totalPolls++;
+        SPoll storage poll = polls[totalPolls];
+        poll.id = totalPolls;
+        poll.creator = msg.sender;
+        poll.title = title;
+        poll.description = description;
+        poll.image = image;
+        poll.category = category;
+        poll.choices = choices;
+        poll.endTime = endTime;
+        poll.timestamp = block.timestamp;
+        poll.isPrivate = isPrivate;
+        poll.allowedVoters = allowedVoters;
+
+        emit PollCreated(
+            poll.id,
+            poll.creator,
+            poll.title,
+            poll.description,
+            poll.image,
+            poll.category,
+            poll.choices,
+            poll.endTime,
+            poll.timestamp,
+            poll.isPrivate,
+            poll.allowedVoters
+        );
+    }
+
+    /**
+     * @param pollId
+     * @return SPoll struct variables seperately
+     */
+    function getPoll(
+        uint256 pollId
+    )
+        public
+        view
+        PollDoesNotExist(pollId)
+        returns (
+            uint256 id,
+            address creator,
+            string memory title,
+            string memory description,
+            string memory image,
+            string memory category,
+            string[2] memory choices,
+            uint256 endTime,
+            uint256 timestamp,
+            bool isPrivate,
+            address[] memory allowedVoters
+        )
+    {
+        SPoll storage poll = polls[pollId];
+
+        return (
+            poll.id,
+            poll.creator,
+            poll.title,
+            poll.description,
+            poll.image,
+            poll.category,
+            poll.choices,
+            poll.endTime,
+            poll.timestamp,
+            poll.isPrivate,
+            poll.allowedVoters
+        );
+    }
+
+    /**
+     * @return SPoll struct array
+     */
+    function getAllPolls() public view returns (SPoll[] memory) {
+        SPoll[] memory allPolls = new SPoll[](totalPolls);
+        for (uint256 i = 1; i <= totalPolls; i++) {
+            allPolls[i - 1] = polls[i];
+        }
+
+        return allPolls;
+    }
+
+    /**
+     * @param pollId
+     * @param choiceIndex
      */
     function vote(
+        uint256 pollId,
         uint256 choiceIndex
     )
         public
-        notOwner
-        userHasVoted
-        votingTime
-        invalidChoiceIndex
-        notAllowedVoter
+        NotOwner(pollId)
+        HasVoted(pollId)
+        CorrectChoiceIndex(choiceIndex)
+        onlyAllowedVoters(pollId)
+        PollDoesNotExist(pollId)
     {
-        emit Vote(msg.sender, choiceIndex, block.timestamp);
+        SPoll storage poll = polls[pollId];
 
-        voters[msg.sender].hasVoted = true;
-        voters[msg.sender].choiceIndex = choiceIndex;
-        voters[msg.sender].voteTime = block.timestamp;
-        votesCount++;
+        SVoter storage voter = poll.voters[totalVoters];
+        voter.voterAddress = msg.sender;
+        voter.choiceIndex = choiceIndex;
+
+        emit PollVoted(poll.id, voter);
     }
 
     /**
-     * @dev Ends the voting process.
-     * @dev Only the owner can call this function.
+     * @param pollId
+     * @return creator address
      */
-    function endVoting() public onlyOwner {
-        state = State.Ended;
-        emit VotingEnded(votingEndTime, votesCount);
+    function getOwner(
+        uint256 pollId
+    ) public view PollDoesNotExist(pollId) returns (address) {
+        return polls[pollId].creator;
     }
 
     /**
-     * @param voterAddress The address of the voter to remove the vote from.
-     * @dev Removes the vote of a voter, if the voter has voted.
+     * @param pollId
+     * @return an object with choice values as keys and vote counts as values
      */
-    function removeVote(
-        address voterAddress
-    ) public notOwner votingTime validVoter(voterAddress) {
-        delete voters[voterAddress];
-        votesCount--;
+    function getAllVoteCount(
+        uint256 pollId
+    ) public view PollDoesNotExist(pollId) returns (uint256[2] memory) {
+        SPoll storage poll = polls[pollId];
+        require(poll.id != 0, "Voting: Poll does not exist");
 
-        emit VoteRemoved(voterAddress, block.timestamp, votesCount);
+        uint256[2] memory voteCount;
+        for (uint256 i = 0; i < poll.voters.length; i++) {
+            voteCount[poll.voters[i].choiceIndex]++;
+        }
+
+        return voteCount;
     }
 
     /**
-     * @return The choices of the voting.
+     * @param pollId
+     * @param choiceIndex to get data from
+     * @return vote count for a specific choice
      */
-    function getChoices() public view returns (string[2] memory) {
-        return choices;
-    }
-
-    /**
-     * @return The state of the voting.
-     */
-    function getState() public view returns (State) {
-        return state;
-    }
-
-    /**
-     * @param voterAddress The address of the voter to get the information from.
-     * @return The voter information of the caller.
-     */
-    function getVoter(address voterAddress) public view returns (Voter memory) {
-        return voters[voterAddress];
-    }
-
-    /**
-     * @return The owner of the voting.
-     */
-    function getOwner() public view returns (address) {
-        return i_owner;
-    }
-
-    /**
-     * @return The allow list of voters.
-     */
-    function getAllowedVoters() public view returns (address[] memory) {
-        return allowedVoters;
-    }
-
-    /**
-     * @param choiceIndex The index of the choice to get the vote count from.
-     * @return The number of votes for a choice.
-     */
-    function getOptionVoteCount(
+    function getChoiceCount(
+        uint256 pollId,
         uint256 choiceIndex
-    ) public view returns (uint256) {
+    )
+        public
+        view
+        PollDoesNotExist(pollId)
+        CorrectChoiceIndex(choiceIndex)
+        returns (uint256)
+    {
+        SPoll storage poll = polls[pollId];
+
         uint256 voteCount = 0;
-        for (
-            uint256 userIndex = 0;
-            userIndex < allowedVoters.length;
-            userIndex++
-        ) {
-            if (voters[allowedVoters[userIndex]].choiceIndex == choiceIndex) {
+        for (uint256 i = 0; i < poll.voters.length; i++) {
+            if (poll.voters[i].choiceIndex == choiceIndex) {
                 voteCount++;
             }
         }
+
         return voteCount;
+    }
+
+    /**
+     * @param pollId
+     * @param choiceIndex to get data from
+     * @return an array of addresses that voted for a specific choice
+     */
+    function getChoiceVotersAddresses(
+        uint256 pollId,
+        uint256 choiceIndex
+    )
+        public
+        view
+        CorrectChoiceIndex(choiceIndex)
+        PollDoesNotExist(pollId)
+        returns (address[] memory)
+    {
+        SPoll storage poll = polls[pollId];
+        require(poll.id != 0, "Voting: Poll does not exist");
+        require(
+            choiceIndex < poll.choices.length,
+            "Voting: Invalid choice index"
+        );
+
+        address[] memory votersAddresses = new address[](poll.voters.length);
+        uint256 votersAddressesIndex = 0;
+        for (uint256 i = 0; i < poll.voters.length; i++) {
+            if (poll.voters[i].choiceIndex == choiceIndex) {
+                votersAddresses[votersAddressesIndex] = poll
+                    .voters[i]
+                    .voterAddress;
+                votersAddressesIndex++;
+            }
+        }
+
+        return votersAddresses;
+    }
+
+    /**
+     * @param pollId to check for address[] allowedVoters
+     * @return an array of addresses that are allowed to vote
+     */
+    function getAllowedVoters(
+        uint256 pollId
+    ) public view PollDoesNotExist(pollId) returns (address[] memory) {
+        SPoll storage poll = polls[pollId];
+        require(poll.id != 0, "Voting: Poll does not exist");
+
+        return poll.allowedVoters;
     }
 }

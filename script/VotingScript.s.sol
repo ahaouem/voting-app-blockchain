@@ -29,16 +29,7 @@ contract VotingScript is Script {
 
         vm.startBroadcast(deployerKey);
 
-        Voting voting = new Voting(
-            votingEndTime,
-            choices,
-            isPrivate,
-            category,
-            description,
-            title,
-            image,
-            allowedVoters
-        );
+        Voting voting = new Voting();
 
         vm.stopBroadcast();
 

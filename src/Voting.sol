@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {VotingInterface} from "./interfaces/VotingInterface.sol";
+
 ///////////////
 //   Errors  //
 ///////////////
@@ -17,7 +19,7 @@ error Voting__UserNotAllowedToVote(address voterAddress);
 
 /// @title Voting Smart Contract for Cloak Voting App
 /// @author Olivier Kobialka @OlivierKobialka 2024
-contract Voting {
+contract Voting is VotingInterface {
     /**
      * @dev pv variables
      * @param totalPolls total number of polls
@@ -26,30 +28,6 @@ contract Voting {
      */
     uint256 private totalPolls = 0;
     uint256 private totalVoters = 0;
-
-    ///////////////
-    //   Struct  //
-    ///////////////
-
-    struct SPoll {
-        uint256 id; // totalPolls.current()
-        address creator; // msg.sender
-        string title;
-        string description;
-        string image;
-        string category;
-        string[2] choices;
-        uint256 endTime;
-        uint256 timestamp; // block.timestamp
-        bool isPrivate;
-        address[] allowedVoters;
-        SVoter[] voters;
-    }
-
-    struct SVoter {
-        address voterAddress; // msg.sender
-        uint256 choiceIndex; // 0 or 1
-    }
 
     /////////////////
     //   Mappings  //
@@ -91,7 +69,7 @@ contract Voting {
         }
         _;
     }
-    
+
     modifier PollDoesNotExist(uint256 pollId) {
         if (pollId > totalPolls) {
             revert Voting__InvalidState();
